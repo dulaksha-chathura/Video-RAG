@@ -1,26 +1,31 @@
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
-RAGIE_API_KEY = os.getenv("RAGIE_API_KEY", "")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-NEON_DATABASE_URL = os.getenv("NEON_DATABASE_URL", "")
+import psycopg2
+from config import NEON_DATABASE_URL
 
 
-def validate_config():
-    missing = []
-    if not RAGIE_API_KEY:
-        missing.append("RAGIE_API_KEY")
-    if not OPENAI_API_KEY:
-        missing.append("OPENAI_API_KEY")
-    if not NEON_DATABASE_URL:
-        missing.append("NEON_DATABASE_URL")
-
-    if missing:
-        raise ValueError(
-            f"Missing required environment variables: {', '.join(missing)}"
-        )
+def get_db_connection():
+    return psycopg2.connect(NEON_DATABASE_URL)
 
 
-validate_config()
+def init_db():
+    """Creates the tracking table in Neon PostgreSQL if it doesn't exist."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS video_documents (
+            id SERIAL PRIMARY KEY,
+            ragie_doc_id VARCHAR(255) UNIQUE NOT NULL,
+            file_name VARCHAR(255) NOT NULL,
+            status VARCHAR(50) DEFAULT 'pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+    print("✓ Neon PostgreSQL database tables initialized.")
+
+
+if __name__ == "__main__":
+    init_db()
